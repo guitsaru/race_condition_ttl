@@ -4,6 +4,15 @@ module RaceConditionTTL
     base.alias_method_chain :write, :entry
   end
 
+  def initialize(*addresses)
+    super
+
+    @race_condition_ttl = mem_cache_options[:race_condition_ttl].to_i
+    if @expires_in.to_i > 0
+      @expires_in += @race_condition_ttl
+    end
+  end
+
   def fetch(key, options = {})
     @logger_off = true
 
@@ -29,7 +38,7 @@ module RaceConditionTTL
       ms = Benchmark.ms { value = yield }
 
       @logger_off = true
-      entry = Entry.new(value, options)
+      entry = Entry.new(value, options.reverse_merge(:expires_in => @expires_in, :race_condition_ttl => @race_condition_ttl))
       write_with_entry(key, entry, options)
       @logger_off = false
 
@@ -70,9 +79,9 @@ module RaceConditionTTL
 
       options ||= {}
 
-      @race_condition_ttl = options[:race_condition_ttl].to_i
+      @race_condition_ttl = options[:race_condition_ttl].to_i.seconds
       if options[:expires_in].to_i > 0
-        @expires_in = options[:expires_in].to_i + @race_condition_ttl
+        @expires_in = options[:expires_in].to_i.seconds + @race_condition_ttl
       else
         @expires_in = 0
       end
@@ -80,7 +89,7 @@ module RaceConditionTTL
 
     def expired?
       return false if @expires_in == 0
-      @created_at + @expires_in - @race_condition_ttl.to_i <= Time.now.to_i
+      @created_at + @expires_in - @race_condition_ttl <= Time.now.to_i
     end
 
     def html_safe

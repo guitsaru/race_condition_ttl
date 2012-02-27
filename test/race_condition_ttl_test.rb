@@ -3,7 +3,7 @@ require 'test_helper'
 class HashCache
   attr_accessor :cache
 
-  def initialize
+  def initialize(*addresses)
     @cache = {}
   end
 
